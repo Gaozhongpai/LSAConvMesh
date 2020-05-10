@@ -68,7 +68,7 @@ args['mode'] = 'train' or 'test'
 
 #### Acknowlegements:
 
-The structure of this codebase is borrowed from [Neural3DMM](https://github.com/gbouritsas/Neural3DMMt).
+The structure of this codebase is borrowed from [Neural3DMM](https://github.com/gbouritsas/Neural3DMM).
 
 # Cite
 
