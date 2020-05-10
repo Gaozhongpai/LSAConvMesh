@@ -40,7 +40,7 @@ class PaiConv(nn.Module):
         batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
         x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats)
         x_neighbors = x_neighbors.permute(1, 0, 3, 2).contiguous()
-	    # x_neighbors = x_neighbors.view(num_pts, bsize*feats, num_neighbor)     
+        # x_neighbors = x_neighbors.view(num_pts, bsize*feats, num_neighbor)     
         # weight = self.softmax(torch.bmm(torch.transpose(x_neighbors, 1, 2), x_neighbors))
         # x_neighbors = torch.bmm(x_neighbors, weight) #.view(num_pts, feats, num_neighbor)
         x_neighbors = torch.bmm(x_neighbors.view(num_pts, bsize*feats, num_neighbor), self.adjweight)  #self.sparsemax(self.adjweight))
