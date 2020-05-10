@@ -278,9 +278,6 @@ if args['loss']=='l1':
 params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print("Total number of parameters is: {}".format(params))
 print(model)
-# print(torch.topk(model.module.index_weight[0], k=8, dim=1))
-# print(M[4].v.shape)
-
 
 #%%
 if args['mode'] == 'train':

@@ -3,7 +3,6 @@ import torch.nn as nn
 import math
 import pdb
 import copy
-#from sparsemax import Sparsemax
 from numpy import inf
 
 class PaiConv(nn.Module):
