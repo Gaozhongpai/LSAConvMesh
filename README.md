@@ -11,7 +11,7 @@ Demand for efficient 3D shape representation learning is increasing in many 3D c
 
 # Repository Requirements
 
-This code was written in Pytorch 1.1. We use tensorboardX for the visualisation of the training metrics. We recommend setting up a virtual environment using [Miniconda](https://docs.conda.io/en/latest/miniconda.html). To install Pytorch in a conda environment, simply run 
+This code was written in Pytorch 1.4. We use tensorboardX for the visualisation of the training metrics. We recommend setting up a virtual environment using [Miniconda](https://docs.conda.io/en/latest/miniconda.html). To install Pytorch in a conda environment, simply run 
 
 ```
 $ conda install pytorch torchvision -c pytorch

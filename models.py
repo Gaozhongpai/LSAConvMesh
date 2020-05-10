@@ -7,14 +7,14 @@ import copy
 from numpy import inf
 
 class PaiConv(nn.Module):
-    def __init__(self, num_pts, in_c, spiral_size, out_c,activation='elu',bias=True): # ,device=None):
+    def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
         super(PaiConv,self).__init__()
         self.in_c = in_c
         self.out_c = out_c
         #self.device = device
-        self.conv = nn.Linear(in_c*spiral_size,out_c,bias=bias)
-        self.adjweight = nn.Parameter(torch.randn(num_pts, spiral_size, spiral_size), requires_grad=True)
-        self.adjweight.data = torch.eye(spiral_size).unsqueeze(0).expand_as(self.adjweight)
+        self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
+        self.adjweight = nn.Parameter(torch.randn(num_pts, num_neighbor, num_neighbor), requires_grad=True)
+        self.adjweight.data = torch.eye(num_neighbor).unsqueeze(0).expand_as(self.adjweight)
         self.zero_padding = torch.ones((1, num_pts, 1))
         self.zero_padding[0,-1,0] = 0.0
         #self.sparsemax = Sparsemax(dim=1)
@@ -33,59 +33,53 @@ class PaiConv(nn.Module):
         else:
             raise NotImplementedError()
 
-    def forward(self,x,spiral_adj, kernal_weight):
+    def forward(self,x,neighbor_index):
         bsize, num_pts, feats = x.size()
-        _, _, spiral_size = spiral_adj.size()
+        _, _, num_neighbor = neighbor_index.size()
         
-        # kernal_weight = kernal_weight[None, :, None, None].to(x)
-        spirals_index = spiral_adj.view(bsize*num_pts*spiral_size) # [1d array of batch,vertx,vertx-adj]
-        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*spiral_size]).view(-1).long() 
-        spirals = x[batch_index,spirals_index,:].view(bsize, num_pts, spiral_size, feats)
-        # spirals = (kernal_weight.expand_as(spirals)*spirals).permute(1, 0, 3, 2).contiguous()
-        spirals = spirals.permute(1, 0, 3, 2).contiguous()
-	    # spirals = spirals.view(num_pts, bsize*feats, spiral_size)     
-        # weight = self.softmax(torch.bmm(torch.transpose(spirals, 1, 2), spirals))
-        # spirals = torch.bmm(spirals, weight) #.view(num_pts, feats, spiral_size)
-        spirals = torch.bmm(spirals.view(num_pts, bsize*feats, spiral_size), self.adjweight)  #self.sparsemax(self.adjweight))
-        spirals = spirals.view(num_pts, bsize, feats, spiral_size).permute(1, 0, 3, 2).contiguous()
-        spirals = self.activation(spirals.view(bsize*num_pts, spiral_size*feats))
-        out_feat = self.activation(self.conv(spirals)).view(bsize,num_pts,self.out_c)
+        neighbor_index = neighbor_index.view(bsize*num_pts*num_neighbor) # [1d array of batch,vertx,vertx-adj]
+        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
+        x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats)
+        x_neighbors = x_neighbors.permute(1, 0, 3, 2).contiguous()
+	    # x_neighbors = x_neighbors.view(num_pts, bsize*feats, num_neighbor)     
+        # weight = self.softmax(torch.bmm(torch.transpose(x_neighbors, 1, 2), x_neighbors))
+        # x_neighbors = torch.bmm(x_neighbors, weight) #.view(num_pts, feats, num_neighbor)
+        x_neighbors = torch.bmm(x_neighbors.view(num_pts, bsize*feats, num_neighbor), self.adjweight)  #self.sparsemax(self.adjweight))
+        x_neighbors = x_neighbors.view(num_pts, bsize, feats, num_neighbor).permute(1, 0, 3, 2).contiguous()
+        x_neighbors = self.activation(x_neighbors.view(bsize*num_pts, num_neighbor*feats))
+        out_feat = self.activation(self.conv(x_neighbors)).view(bsize,num_pts,self.out_c)
         out_feat = out_feat * self.zero_padding.to(out_feat.device)
         return out_feat
 
 
 class PaiAutoencoder(nn.Module):
-    def __init__(self, filters_enc, filters_dec, latent_size, sizes, spiral_sizes, spirals, D, U, activation = 'elu'):
+    def __init__(self, filters_enc, filters_dec, latent_size, sizes, num_neighbors, x_neighbors, D, U, activation = 'elu'):
         super(PaiAutoencoder, self).__init__()
         self.latent_size = latent_size
         self.sizes = sizes
-        self.spirals = [torch.cat([torch.cat([torch.arange(x.shape[0]-1), torch.tensor([-1])]).unsqueeze(1), x], 1) for x in spirals]
-        #self.spirals = [x.float().cuda() for x in spirals]
+        self.x_neighbors = [torch.cat([torch.cat([torch.arange(x.shape[0]-1), torch.tensor([-1])]).unsqueeze(1), x], 1) for x in x_neighbors]
+        #self.x_neighbors = [x.float().cuda() for x in x_neighbors]
         self.filters_enc = filters_enc
         self.filters_dec = filters_dec
-        self.spiral_sizes = spiral_sizes
+        self.num_neighbors = num_neighbors
         self.D = [nn.Parameter(x, False) for x in D]
         self.D = nn.ParameterList(self.D)
         self.U = [nn.Parameter(x, False) for x in U]
         self.U = nn.ParameterList(self.U)
-        # self.spirals_const = [torch.zeros(len(x), self.spiral_sizes[i], dtype=torch.float32).cuda() - 1 for i, x in enumerate(self.spirals)]
-        # self.index_weight = [nn.Parameter(torch.randn(len(x), self.spiral_sizes[i] - 1), requires_grad=True) for i, x in enumerate(self.spirals)]
-        # self.index_weight = nn.ParameterList(self.index_weight)
-        self.kernal_weight = [self.spiral_sizes[i] / (self.spiral_sizes[i] + 1 - (x == -1.).sum(1)).float() for i, x in enumerate(self.spirals)]
-        self.kernal_weight = [x / torch.mean(x[:-1]) for x in self.kernal_weight]
+
         self.eps = 1e-7
         #self.reset_parameters()
         #self.device = device
         self.activation = activation
         self.conv = []
         input_size = filters_enc[0][0]
-        for i in range(len(spiral_sizes)-1):
+        for i in range(len(num_neighbors)-1):
             if filters_enc[1][i]:
-                self.conv.append(PaiConv(self.spirals[i].shape[0], input_size, spiral_sizes[i], filters_enc[1][i],
+                self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
                                             activation=self.activation))
                 input_size = filters_enc[1][i]
 
-            self.conv.append(PaiConv(self.spirals[i].shape[0], input_size, spiral_sizes[i], filters_enc[0][i+1],
+            self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
                                         activation=self.activation))
             input_size = filters_enc[0][i+1]
 
@@ -96,26 +90,26 @@ class PaiAutoencoder(nn.Module):
         
         self.dconv = []
         input_size = filters_dec[0][0]
-        for i in range(len(spiral_sizes)-1):
-            if i != len(spiral_sizes)-2:
-                self.dconv.append(PaiConv(self.spirals[-2-i].shape[0], input_size, spiral_sizes[-2-i], filters_dec[0][i+1],
+        for i in range(len(num_neighbors)-1):
+            if i != len(num_neighbors)-2:
+                self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                              activation=self.activation))
                 input_size = filters_dec[0][i+1]  
                 
                 if filters_dec[1][i+1]:
-                    self.dconv.append(PaiConv(self.spirals[-2-i].shape[0], input_size,spiral_sizes[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[1][i+1]
             else:
                 if filters_dec[1][i+1]:
-                    self.dconv.append(PaiConv(self.spirals[-2-i].shape[0], input_size, spiral_sizes[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[0][i+1]                      
-                    self.dconv.append(PaiConv(self.spirals[-2-i].shape[0], input_size,spiral_sizes[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation='identity')) 
                     input_size = filters_dec[1][i+1] 
                 else:
-                    self.dconv.append(PaiConv(self.spirals[-2-i].shape[0], input_size, spiral_sizes[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation='identity'))
                     input_size = filters_dec[0][i+1]                      
                     
@@ -126,19 +120,6 @@ class PaiAutoencoder(nn.Module):
     #         x.data.uniform_(0.0, 1.0)
     #         x.data = (x / x.sum(1, keepdim=True)).clamp(min=self.eps)
     #         x.data, _  = x.data.sort(descending=True)
-    
-    # def updateIndex(self):
-    #     self.spirals_const = [x.detach().fill_(-1.) for x in self.spirals_const]
-    #     for i, adj in enumerate(self.spirals_const):
-    #         adj[:-1, 0] = torch.arange(adj.shape[0]-1)
-    #         #self.index_weight[i].data = (self.index_weight[i] / \
-    #         #    self.index_weight[i].sum(1, keepdim=True)).clamp(min=self.eps)
-    #         #index_weight = nn.functional.softmax(self.index_weight[i], dim=1)
-    #         weight, inx = torch.topk(self.index_weight[i], k=self.spiral_sizes[0]-1, dim=1)
-    #         inx = ((weight - weight.detach())*0.0001 + 1)*inx.float()
-    #         #inx = inx.float()
-    #         y_inx = ((inx - inx.detach() + 1)*self.spirals[i])
-    #         adj[:, 1:] = torch.full_like(y_inx, 0).scatter_(1, inx.long(), y_inx)
 
     def poolwT(self, x, L):
         Mp = L.shape[0]
@@ -154,15 +135,15 @@ class PaiAutoencoder(nn.Module):
 
     def encode(self,x):
         bsize = x.size(0)
-        S = self.spirals
+        S = self.x_neighbors
         D = self.D
         
         j = 0
-        for i in range(len(self.spiral_sizes)-1):
-            x = self.conv[j](x,S[i].repeat(bsize,1,1), self.kernal_weight[i])
+        for i in range(len(self.num_neighbors)-1):
+            x = self.conv[j](x,S[i].repeat(bsize,1,1))
             j+=1
             if self.filters_enc[1][i]:
-                x = self.conv[j](x,S[i].repeat(bsize,1,1), self.kernal_weight[i])
+                x = self.conv[j](x,S[i].repeat(bsize,1,1))
                 j+=1
             #x = torch.matmul(D[i],x)
             x = self.poolwT(x, D[i])
@@ -171,18 +152,18 @@ class PaiAutoencoder(nn.Module):
     
     def decode(self,z):
         bsize = z.size(0)
-        S = self.spirals
+        S = self.x_neighbors
         U = self.U
         x = self.fc_latent_dec(z)
         x = x.view(bsize,self.sizes[-1]+1,-1)
         j=0
-        for i in range(len(self.spiral_sizes)-1):
+        for i in range(len(self.num_neighbors)-1):
             #x = torch.matmul(U[-1-i],x)
             x = self.poolwT(x, U[-1-i])
-            x = self.dconv[j](x,S[-2-i].repeat(bsize,1,1), self.kernal_weight[-2-i])
+            x = self.dconv[j](x,S[-2-i].repeat(bsize,1,1))
             j+=1
             if self.filters_dec[1][i+1]: 
-                x = self.dconv[j](x,S[-2-i].repeat(bsize,1,1), self.kernal_weight[-2-i])
+                x = self.dconv[j](x,S[-2-i].repeat(bsize,1,1))
                 j+=1
         return x
 

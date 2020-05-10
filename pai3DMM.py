@@ -42,7 +42,7 @@ torch.cuda.get_device_name(device_idx)
 #%%
 args = {}
 
-generative_model = 'pai_autoencoder_wo_norm'
+generative_model = 'pai_autoencoder'
 downsample_method = 'COMA_downsample' # choose'COMA_downsample' or 'meshlab_downsample'
 
 
@@ -192,14 +192,6 @@ else:
 tD = [sparse_mx_to_torch_sparse_tensor(s) for s in bD]
 tU = [sparse_mx_to_torch_sparse_tensor(s) for s in bU]
 
-'''
-spirals_np, spiral_sizes,spirals = generate_spirals(args['step_sizes'],
-                                                    M, Adj, Trigs,
-                                                    reference_points = reference_points,
-                                                    dilation = args['dilation'], random = False,
-                                                    meshpackage = shapedata.meshpackage,
-                                                    counter_clockwise = True)
-'''
 #%%
 torch.manual_seed(args['seed'])
 
@@ -252,13 +244,13 @@ dataloader_test = DataLoader(
     #num_workers = args['num_workers']
     )
 
-if 'pai_autoencoder_wo_norm' in args['generative_model']:
+if 'pai_autoencoder' in args['generative_model']:
     model = PaiAutoencoder(filters_enc = args['filter_sizes_enc'],
                               filters_dec = args['filter_sizes_dec'],
                               latent_size=args['nz'],
                               sizes=sizes,
-                              spiral_sizes=kernal_size,
-                              spirals=Adj,
+                              num_neighbors=kernal_size,
+                              x_neighbors=Adj,
                               D=tD, U=tU).to(device)
     model = torch.nn.DataParallel(model)
 
@@ -313,7 +305,7 @@ if args['mode'] == 'train':
     else:
         start_epoch = 0
 
-    if args['generative_model'] == 'pai_autoencoder_wo_norm':
+    if args['generative_model'] == 'pai_autoencoder':
         train_autoencoder_dataloader(dataloader_train, dataloader_val,
                           device, model, optim, loss_fn,
                           bsize = args['batch_size'],
