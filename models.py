@@ -10,7 +10,6 @@ class PaiConv(nn.Module):
         super(PaiConv,self).__init__()
         self.in_c = in_c
         self.out_c = out_c
-        #self.device = device
         self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
         self.adjweight = nn.Parameter(torch.randn(num_pts, num_neighbor, num_neighbor), requires_grad=True)
         self.adjweight.data = torch.eye(num_neighbor).unsqueeze(0).expand_as(self.adjweight)

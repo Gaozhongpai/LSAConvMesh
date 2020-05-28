@@ -16,11 +16,10 @@ from shape_data import ShapeData
 from autoencoder_dataset import autoencoder_dataset
 from torch.utils.data import DataLoader
 
-from spiral_utils import get_adj_trigs
+from utils import get_adj_trigs, sparse_mx_to_torch_sparse_tensor
 from models import PaiAutoencoder
 from train_funcs import train_autoencoder_dataloader
 from test_funcs import test_autoencoder_dataloader
-from spiral_utils import sparse_mx_to_torch_sparse_tensor
 import scipy.sparse as sp
 from device import device
 import torch
@@ -62,7 +61,7 @@ reference_points = [[414]]  # [[3567,4051,4597]] used for COMA with 3 disconnect
 
 args = {'generative_model': generative_model,
         'name': name, 'data': os.path.join(root_dir, 'Processed',name),
-        'results_folder':  os.path.join(root_dir,'results/spirals_'+ generative_model),
+        'results_folder':  os.path.join(root_dir,'results/'+ generative_model),
         'reference_mesh_file':reference_mesh_file, 'downsample_directory': downsample_directory,
         'checkpoint_file': 'checkpoint',
         'seed':2, 'loss':'l1',
@@ -193,17 +192,7 @@ tU = [sparse_mx_to_torch_sparse_tensor(s) for s in bU]
 
 #%%
 torch.manual_seed(args['seed'])
-
-# if GPU:
-#     device = torch.device("cuda:"+str(device_idx) if torch.cuda.is_available() else "cpu")
-# else:
-#     device = torch.device("cpu")
 print(device)
-
-# tspirals = [torch.from_numpy(s).long().to(device) for s in spirals_np]
-# tD = [torch.from_numpy(s).float().to(device) for s in bD]
-# tU = [torch.from_numpy(s).float().to(device) for s in bU]
-
 
 #%%
 # Building model, optimizer, and loss function
