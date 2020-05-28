@@ -66,7 +66,7 @@ args['mode'] = 'train' or 'test'
 ```
 
 #### Some important notes:
-* The code has compatibility with both _mpi-mesh_ and _trimesh_ packages (it can be chosen by setting the _meshpackage_ variable in the first cell of the notebook).
+* The code has compatibility with both _mpi-mesh_ and _trimesh_ packages (it can be chosen by setting the _meshpackage_ variable pai3DMM.py).
 
 #### Acknowlegements:
 
