@@ -35,18 +35,19 @@ The following is the organization of the dataset directories expected by the cod
 * data **root_dir**/
   * **dataset** name/ (eg DFAUST)
     * template
-      * template.obj (all of the spiraling and downsampling code is run on the template only once)
+      * template.obj
       * downsample_method/
         * downsampling_matrices.pkl (created by the code the first time you run it)
     * preprocessed/
-      * train.npy (number_meshes, number_vertices, 3) (no Faces because they all share topology)
-      * test.npy 
-      * points_train/ (created by data_generation.py)
-      * points_val/ (created by data_generation.py)
-      * points_test/ (created by data_generation.py)
-      * paths_train.npy (created by data_generation.py)
-      * paths_val.npy (created by data_generation.py)
-      * paths_test.npy (created by data_generation.py)
+      * sliced
+        * train.npy (number_meshes, number_vertices, 3) (no Faces because they all share topology)
+        * test.npy 
+        * points_train/ (created by data_generation.py)
+        * points_val/ (created by data_generation.py)
+        * points_test/ (created by data_generation.py)
+        * paths_train.npy (created by data_generation.py)
+        * paths_val.npy (created by data_generation.py)
+        * paths_test.npy (created by data_generation.py)
 
 # Usage
 

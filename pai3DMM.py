@@ -16,11 +16,10 @@ from shape_data import ShapeData
 from autoencoder_dataset import autoencoder_dataset
 from torch.utils.data import DataLoader
 
-from spiral_utils import get_adj_trigs, generate_spirals
+from spiral_utils import get_adj_trigs
 from models import PaiAutoencoder
 from train_funcs import train_autoencoder_dataloader
 from test_funcs import test_autoencoder_dataloader
-from spiral_utils import generate_pai, compute_tri_ver_normal
 from spiral_utils import sparse_mx_to_torch_sparse_tensor
 import scipy.sparse as sp
 from device import device
@@ -114,8 +113,8 @@ if not os.path.exists(args['data']+'/mean.tch') or not os.path.exists(args['data
                           reference_mesh_file=args['reference_mesh_file'],
                           normalization = args['normalization'],
                           meshpackage = meshpackage, load_flag = True)
-    np.save(args['data']+'/mean.npy', shapedata.mean)
-    np.save(args['data']+'/std.npy', shapedata.std)
+    torch.save(args['data']+'/mean.tch', shapedata.mean)
+    torch.save(args['data']+'/std.tch', shapedata.std)
 else:
     shapedata = ShapeData(nVal=args['nVal'],
                          train_file=args['data']+'/train.npy',
@@ -218,7 +217,7 @@ dataset_train = autoencoder_dataset(
 dataloader_train = DataLoader(
     dataset_train, batch_size=args['batch_size'],
     shuffle=args['shuffle'],
-    #num_workers = args['num_workers']
+    num_workers = args['num_workers']
     )
 
 dataset_val = autoencoder_dataset(
