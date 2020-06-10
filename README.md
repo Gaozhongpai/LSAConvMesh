@@ -2,12 +2,13 @@
 
 # Learning Local Neighboring Structure for Robust 3D Shape Representation
 ![PaiNeural3DMM architecture](images/architecture.png "PaiNeural3DMM architecture")
+This repository is the official implementation of my paper: "Learning Local Neighboring Structure for Robust 3D Shape Representation"
 # Project Abstract 
 Mesh is a powerful data structure for 3D shapes. Representation learning for 3D meshes is important in many computer vision and graphics applications. The recent success of convolutional neural networks (CNNs) for structured data (e.g., images) suggests the value of adapting insight from CNN for 3D shapes. However, 3D shape data are irregular since each node's neighbors are unordered. Various graph neural networks for 3D shapes have been developed with isotropic filters or predefined local coordinate systems to overcome the node inconsistency on graphs. However, isotropic filters or predefined local coordinate systems limit the representation power. In this paper, we propose a local structure-aware anisotropic convolutional operation (LSA-Conv) that learns adaptive weighting matrices for each node according to the local neighboring structure and performs shared anisotropic filters. In fact, the learnable weighting matrix is similar to the attention matrix in random synthesizer -- a new Transformer model for natural language processing (NLP). Comprehensive experiments demonstrate that our model produces significant improvement in 3D shape reconstruction compared to state-of-the-art methods. 
 
 [Arxiv link](https://arxiv.org/abs/2004.09995)
 
-![Pai-Conv](images/architecture.png "Pai-Conv operation")
+![Pai-Conv](images/pai-gcn.png "Pai-Conv operation")
 
 ![Results](images/results.png "Results")
 
@@ -64,10 +65,15 @@ $ python data_generation.py --root_dir=/path/to/data_root_dir --dataset=DFAUST -
 
 ```
 args['mode'] = 'train' or 'test'
+
+python pai3DMM.py
 ```
 
 #### Some important notes:
 * The code has compatibility with both _mpi-mesh_ and _trimesh_ packages (it can be chosen by setting the _meshpackage_ variable pai3DMM.py).
+
+
+
 
 #### Acknowlegements:
 
