@@ -7,7 +7,8 @@ Mesh is a powerful data structure for 3D shapes. Representation learning for 3D 
 
 [Arxiv link](https://arxiv.org/abs/2004.09995)
 
-![Pai-Conv](images/pai-gcn.png "Pai-Conv operation")
+![Pai-Conv](images/architecture.png "Pai-Conv operation")
+
 ![Results](images/results.png "Results")
 
 # Repository Requirements
