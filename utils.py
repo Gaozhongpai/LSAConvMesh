@@ -46,15 +46,8 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx, is_L=False):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def get_adj_trigs(A, F, reference_mesh, meshpackage = 'mpi-mesh'):
+def get_adj(A):
     
-    # Adj = []
-    # for x in A:
-    #     adj_x = []
-    #     dx = x.todense()
-    #     for i in range(x.shape[0]):
-    #         adj_x.append(dx[i].nonzero()[1])
-    #     Adj.append(adj_x)
     kernal_size = 9
     A_temp = []
     for x in A:
@@ -80,26 +73,4 @@ def get_adj_trigs(A, F, reference_mesh, meshpackage = 'mpi-mesh'):
         index_list = torch.stack([torch.cat([i, i.new_zeros(
             kernal_size - 1 - i.size(0))-1], 0) for inx, i in enumerate(index_list)], 0)
         Adj.append(index_list)
-
-    if meshpackage =='trimesh':
-        mesh_faces = reference_mesh.faces
-    elif meshpackage =='mpi-mesh':
-        mesh_faces = reference_mesh.f
-    # Create Triangles List
-
-    trigs_full = [[] for i in range(len(Adj[0]))]
-    for t in mesh_faces:
-        u, v, w = t
-        trigs_full[u].append((u,v,w))
-        trigs_full[v].append((u,v,w))
-        trigs_full[w].append((u,v,w))
-
-    Trigs = [trigs_full]
-    for i,T in enumerate(F):
-        trigs_down = [[] for i in range(len(Adj[i+1]))]
-        for u,v,w in T:
-            trigs_down[u].append((u,v,w))
-            trigs_down[v].append((u,v,w))
-            trigs_down[w].append((u,v,w))
-        Trigs.append(trigs_down)
-    return Adj, Trigs
+    return Adj

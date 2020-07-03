@@ -7,8 +7,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
                                  device, model, optim, loss_fn, 
                                  bsize, start_epoch, n_epochs, eval_freq, scheduler = None,
                                  writer=None, save_recons=True, shapedata = None,
-                                 metadata_dir=None, samples_dir = None, checkpoint_path = None, 
-                                 generative_model='autoencoder'):
+                                 metadata_dir=None, samples_dir = None, checkpoint_path=None):
     if not shapedata.normalization:
         shapedata_mean = torch.Tensor(shapedata.mean).to(device)
         shapedata_std = torch.Tensor(shapedata.std).to(device)
@@ -17,31 +16,19 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
 
     for epoch in range(start_epoch, n_epochs):
         model.train()
-        
-        #%% network
-        #for k, param in model.named_parameters():
-        #    param.requires_grad = False if 'index_weight' in k or 'D.' in k or 'U.' in k else True  
-        #model.module.updateIndex()      
+            
         tloss = []
         for b, sample_dict in enumerate(tqdm(dataloader_train)):
             optim.zero_grad()
                 
             tx = sample_dict['points'].to(device)
             cur_bsize = tx.shape[0]
-            #model.module.updateIndex()
             tx_hat = model(tx)
             loss = loss_fn(tx, tx_hat)
-            # index_weight = model.module.index_weight
-            # loss_weight = sum([torch.abs(torch.mean(torch.norm(index_weight[i], p=1, dim=1)) - 1) \
-            #                   for i in range(len(index_weight))])
-            # loss_sum = loss + loss_weight 
-            # loss_sum.backward()   
+
             loss.backward()
             optim.step()
-            
-            #for k, param in model.named_parameters():
-            #    if 'index_weight' in k:
-            #        param.data.clamp_(0., 1.)
+        
             if shapedata.normalization:
                 tloss.append(cur_bsize * loss.item())
             else:
@@ -64,26 +51,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
                 writer.add_scalar('loss/loss/data_loss',loss.item(),total_steps)
                 writer.add_scalar('training/learning_rate', optim.param_groups[0]['lr'],total_steps)
             total_steps += 1
-        '''
-        #%% index
-        for k, param in model.named_parameters():
-            param.requires_grad = False if 'index_weight' not in k or 'D.' in k or 'U.' in k else True
-        for b, sample_dict in enumerate(tqdm(dataloader_train2)):
-            optim.zero_grad()
-            tx = sample_dict['points'].to(device)
 
-            cur_bsize = tx.shape[0]
-            model.module.updateIndex()
-            tx_hat = model(tx)
-            loss = loss_fn(tx, tx_hat)
-
-            index_weight = model.module.index_weight
-            loss_weight = sum([torch.abs(torch.mean(torch.norm(index_weight[i], p=1, dim=1)) - 1) \
-                              for i in range(len(index_weight))])
-            loss_sum = loss + loss_weight 
-            loss_sum.backward()   
-            optim.step()
-        '''
         # validate
         model.eval()
         vloss = []
@@ -91,8 +59,6 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
             for b, sample_dict in enumerate(tqdm(dataloader_val)):
 
                 tx = sample_dict['points'].to(device)
-                # if '_autoencoder' in generative_model:
-                #     tx = tx[:, :-1, :]
                 cur_bsize = tx.shape[0]
 
                 tx_hat = model(tx)               
@@ -129,12 +95,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
             # print(torch.topk(model.module.index_weight[0], k=8, dim=1))
         else:
             print('epoch {0} | tr {1} '.format(epoch,epoch_tloss))
-        #model = model.cpu()
-        # if '_autoencoder' in generative_model:
-        #     shape_dict = model.module.state_dict()
-        #     shape_dict = {k: v for k, v in shape_dict.items() if 'D.' not in k and \
-        #             'U.' not in k and 'p.' not in k and 'L.' not in k and 'A.' not in k}
-        # else:
+
         shape_dict = model.module.state_dict()
         shape_dict = {k: v for k, v in shape_dict.items() if 'D.' not in k and 'U.' not in k}
         torch.save({'epoch': epoch,
@@ -149,8 +110,6 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
             'optimizer_state_dict' : optim.state_dict(),
             'scheduler_state_dict': scheduler.state_dict(),
             },os.path.join(metadata_dir, checkpoint_path+'%s.pth.tar'%(epoch)))
-
-        #model = model.to(device)
 
         if save_recons:
             with torch.no_grad():

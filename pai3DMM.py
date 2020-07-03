@@ -16,7 +16,7 @@ from shape_data import ShapeData
 from autoencoder_dataset import autoencoder_dataset
 from torch.utils.data import DataLoader
 
-from utils import get_adj_trigs, sparse_mx_to_torch_sparse_tensor
+from utils import get_adj, sparse_mx_to_torch_sparse_tensor
 from models import PaiAutoencoder
 from train_funcs import train_autoencoder_dataloader
 from test_funcs import test_autoencoder_dataloader
@@ -52,12 +52,6 @@ kernal_size = [9, 9, 9, 9, 9]
 step_sizes = [2, 2, 1, 1, 1]
 filter_sizes_enc = [[3, 16, 32, 64, 128],[[],[],[],[],[]]]
 filter_sizes_dec = [[128, 64, 32, 32, 16],[[],[],[],[],3]]
-dilation_flag = True
-if dilation_flag:
-    dilation=[2, 2, 1, 1, 1]
-else:
-    dilation = None
-reference_points = [[414]]  # [[3567,4051,4597]] used for COMA with 3 disconnected components
 
 args = {'generative_model': generative_model,
         'name': name, 'data': os.path.join(root_dir, 'Processed',name),
@@ -68,10 +62,9 @@ args = {'generative_model': generative_model,
         'batch_size':32, 'num_epochs':300, 'eval_frequency':200, 'num_workers': 6,
         'filter_sizes_enc': filter_sizes_enc, 'filter_sizes_dec': filter_sizes_dec,
         'nz':8,
-        'ds_factors': ds_factors, 'step_sizes' : step_sizes, 'dilation': dilation,
-
-        'lr':1e-3,
-        'regularization': 5e-5,
+        'ds_factors': ds_factors, 'step_sizes' : step_sizes,
+        
+        'lr':1e-3, 'regularization': 5e-5,
         'scheduler': True, 'decay_rate': 0.99,'decay_steps':1,
         'resume': False,
 
@@ -151,22 +144,13 @@ else:
     U = downsampling_matrices['U']
     F = downsampling_matrices['F']
 
-# Needs also an extra check to enforce points to belong to different disconnected component at each hierarchy level
-print("Calculating reference points for downsampled versions..")
-for i in range(len(args['ds_factors'])):
-    if shapedata.meshpackage == 'mpi-mesh':
-        dist = euclidean_distances(M[i+1].v, M[0].v[reference_points[0]])
-    elif shapedata.meshpackage == 'trimesh':
-        dist = euclidean_distances(M[i+1].vertices, M[0].vertices[reference_points[0]])
-    reference_points.append(np.argmin(dist,axis=0).tolist())
-
 #%%
 if shapedata.meshpackage == 'mpi-mesh':
     sizes = [x.v.shape[0] for x in M]
 elif shapedata.meshpackage == 'trimesh':
     sizes = [x.vertices.shape[0] for x in M]
 if not os.path.exists(os.path.join(args['downsample_directory'],'pai_matrices.pkl')):
-    Adj, Trigs = get_adj_trigs(A, F, shapedata.reference_mesh, meshpackage = shapedata.meshpackage)
+    Adj = get_adj(A)
     bU = []
     bD = []
     for i in range(len(D)):
