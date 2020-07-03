@@ -13,10 +13,13 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
         shapedata_std = torch.Tensor(shapedata.std).to(device)
     
     total_steps = start_epoch*len(dataloader_train)
-
     for epoch in range(start_epoch, n_epochs):
         model.train()
+<<<<<<< HEAD
             
+=======
+        
+>>>>>>> c7c32b692e40777ae67820ac61bb7fdccd56a93b
         tloss = []
         for b, sample_dict in enumerate(tqdm(dataloader_train)):
             optim.zero_grad()
@@ -25,10 +28,17 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
             cur_bsize = tx.shape[0]
             tx_hat = model(tx)
             loss = loss_fn(tx, tx_hat)
+<<<<<<< HEAD
 
             loss.backward()
             optim.step()
         
+=======
+  
+            loss.backward()
+            optim.step()
+            
+>>>>>>> c7c32b692e40777ae67820ac61bb7fdccd56a93b
             if shapedata.normalization:
                 tloss.append(cur_bsize * loss.item())
             else:
@@ -51,7 +61,11 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
                 writer.add_scalar('loss/loss/data_loss',loss.item(),total_steps)
                 writer.add_scalar('training/learning_rate', optim.param_groups[0]['lr'],total_steps)
             total_steps += 1
+<<<<<<< HEAD
 
+=======
+   
+>>>>>>> c7c32b692e40777ae67820ac61bb7fdccd56a93b
         # validate
         model.eval()
         vloss = []
