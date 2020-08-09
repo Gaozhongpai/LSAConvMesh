@@ -50,6 +50,53 @@ class PaiConv(nn.Module):
         return out_feat
 
 
+class FeaStConv(nn.Module):
+    def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
+        super(FeaStConv,self).__init__()
+        self.in_c = in_c
+        self.out_c = out_c
+        self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
+        self.mlp = nn.Conv1d(in_c, num_neighbor, kernel_size=1, bias=bias)
+        self.zero_padding = torch.ones((1, num_pts, 1))
+        self.zero_padding[0,-1,0] = 0.0
+        self.softmax = nn.Softmax(dim=1)
+        if activation == 'relu':
+            self.activation = nn.ReLU()
+        elif activation == 'elu':
+            self.activation = nn.ELU()
+        elif activation == 'leaky_relu':
+            self.activation = nn.LeakyReLU(0.02)
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
+        elif activation == 'tanh':
+            self.activation = nn.Tanh()
+        elif activation == 'identity':
+            self.activation = lambda x: x
+        else:
+            raise NotImplementedError()
+
+    def forward(self,x,neighbor_index):
+        bsize, num_pts, feats = x.size()
+        _, _, num_neighbor = neighbor_index.size()
+        
+        neighbor_index = neighbor_index.view(bsize*num_pts*num_neighbor) # [1d array of batch,vertx,vertx-adj]
+        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
+        x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats).view(bsize*num_pts, num_neighbor, feats)
+        x_neighbors = x_neighbors.permute(0, 2, 1).contiguous()
+
+        #### relative position ####
+        x_repeat = x_neighbors[:, :, 0:1].expand_as(x_neighbors)
+        x_relative = x_neighbors - x_repeat
+        x_relative[x_neighbors == 0.] = 0.
+        permatrix = self.softmax(self.mlp(x_relative))
+
+        x_neighbors = torch.matmul(x_neighbors, permatrix) 
+        x_neighbors = x_neighbors.view(bsize*num_pts, -1)
+        out_feat = self.activation(self.conv(x_neighbors)).view(bsize,num_pts,self.out_c)  
+        out_feat = out_feat * self.zero_padding.to(out_feat.device)
+        return out_feat
+
+
 class PaiAutoencoder(nn.Module):
     def __init__(self, filters_enc, filters_dec, latent_size, sizes, num_neighbors, x_neighbors, D, U, activation = 'elu'):
         super(PaiAutoencoder, self).__init__()
@@ -73,11 +120,11 @@ class PaiAutoencoder(nn.Module):
         input_size = filters_enc[0][0]
         for i in range(len(num_neighbors)-1):
             if filters_enc[1][i]:
-                self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
+                self.conv.append(FeaStConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
                                             activation=self.activation))
                 input_size = filters_enc[1][i]
 
-            self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
+            self.conv.append(FeaStConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
                                         activation=self.activation))
             input_size = filters_enc[0][i+1]
 
@@ -90,24 +137,24 @@ class PaiAutoencoder(nn.Module):
         input_size = filters_dec[0][0]
         for i in range(len(num_neighbors)-1):
             if i != len(num_neighbors)-2:
-                self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                              activation=self.activation))
                 input_size = filters_dec[0][i+1]  
                 
                 if filters_dec[1][i+1]:
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[1][i+1]
             else:
                 if filters_dec[1][i+1]:
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[0][i+1]                      
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation='identity')) 
                     input_size = filters_dec[1][i+1] 
                 else:
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation='identity'))
                     input_size = filters_dec[0][i+1]                      
                     
