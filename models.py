@@ -85,9 +85,7 @@ class FeaStConv(nn.Module):
         x_neighbors = x_neighbors.permute(0, 2, 1).contiguous()
 
         #### relative position ####
-        x_repeat = x_neighbors[:, :, 0:1].expand_as(x_neighbors)
-        x_relative = x_neighbors - x_repeat
-        x_relative[x_neighbors == 0.] = 0.
+        x_relative = x_neighbors - x_neighbors[:, :, 0:1]
         permatrix = self.softmax(self.mlp(x_relative))
 
         x_neighbors = torch.matmul(x_neighbors, permatrix) 
