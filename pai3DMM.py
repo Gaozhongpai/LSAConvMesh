@@ -59,9 +59,9 @@ args = {'generative_model': generative_model,
         'reference_mesh_file':reference_mesh_file, 'downsample_directory': downsample_directory,
         'checkpoint_file': 'checkpoint',
         'seed':2, 'loss':'l1',
-        'batch_size':32, 'num_epochs':300, 'eval_frequency':200, 'num_workers': 6,
+        'batch_size':32, 'num_epochs':300, 'eval_frequency':200, 'num_workers': 8,
         'filter_sizes_enc': filter_sizes_enc, 'filter_sizes_dec': filter_sizes_dec,
-        'nz':8,
+        'nz':32,
         'ds_factors': ds_factors, 'step_sizes' : step_sizes,
         
         'lr':1e-3, 'regularization': 5e-5,
@@ -262,11 +262,11 @@ if args['mode'] == 'train':
         print('loading checkpoint from file %s'%(os.path.join(checkpoint_path,args['checkpoint_file'])))
         checkpoint_dict = torch.load(os.path.join(checkpoint_path,args['checkpoint_file']+'.pth.tar'),map_location=device)
         start_epoch = checkpoint_dict['epoch'] + 1
-        model_dict = model.module.state_dict()
+        model_dict = model.state_dict()
         pretrained_dict = checkpoint_dict['autoencoder_state_dict']
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         model_dict.update(pretrained_dict) 
-        model.module.load_state_dict(pretrained_dict, strict=False)
+        model.load_state_dict(pretrained_dict, strict=False)
         #model.load_state_dict(checkpoint_dict['autoencoder_state_dict'])
         optim.load_state_dict(checkpoint_dict['optimizer_state_dict'])
         scheduler.load_state_dict(checkpoint_dict['scheduler_state_dict'])
@@ -295,11 +295,11 @@ if args['mode'] == 'test':
     checkpoint_dict = torch.load(os.path.join(checkpoint_path,args['checkpoint_file']+'.pth.tar'),map_location=device)
     
     print('Current Epoch is {}.'.format(checkpoint_dict['epoch']))
-    model_dict = model.module.state_dict()
+    model_dict = model.state_dict()
     pretrained_dict = checkpoint_dict['autoencoder_state_dict']
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and "U." not in k and "D." not in k}
     model_dict.update(pretrained_dict) 
-    model.module.load_state_dict(pretrained_dict, strict=False)
+    model.load_state_dict(pretrained_dict, strict=False)
     #model.load_state_dict(checkpoint_dict['autoencoder_state_dict'])
 
     predictions, norm_l1_loss, l2_loss = test_autoencoder_dataloader(device, model, dataloader_test,

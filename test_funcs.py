@@ -2,14 +2,16 @@ import torch
 import copy
 from tqdm import tqdm
 import numpy as np
+import time
 
-def test_autoencoder_dataloader(device, model, dataloader_test, shapedata, mm_constant = 1000):
+def test_autoencoder_dataloader(device, model, dataloader_test, shapedata, mm_constant=1000):
     model.eval()
     l1_loss = 0
     l2_loss = 0
     shapedata_mean = torch.Tensor(shapedata.mean).to(device)
     shapedata_std = torch.Tensor(shapedata.std).to(device)
     with torch.no_grad():
+        start_time = time.time()
         for i, sample_dict in enumerate(tqdm(dataloader_test)):
             tx = sample_dict['points'].to(device)
             prediction = model(tx)  
@@ -29,7 +31,7 @@ def test_autoencoder_dataloader(device, model, dataloader_test, shapedata, mm_co
             x_recon = (x_recon * shapedata_std + shapedata_mean) * mm_constant
             x = (x * shapedata_std + shapedata_mean) * mm_constant
             l2_loss+= torch.mean(torch.sqrt(torch.sum((x_recon - x)**2,dim=2)))*x.shape[0]/float(len(dataloader_test.dataset))
-            
+        print("--- %s seconds ---" % (time.time() - start_time))
         predictions = predictions.cpu()
         # l1_loss = l1_loss.item()
         # l2_loss = l2_loss.item()

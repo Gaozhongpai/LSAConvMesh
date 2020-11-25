@@ -4,6 +4,7 @@ import math
 import pdb
 import copy
 from numpy import inf
+from sparsemax import Sparsemax
 
 class PaiConv(nn.Module):
     def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
@@ -43,6 +44,51 @@ class PaiConv(nn.Module):
         # weight = self.softmax(torch.bmm(torch.transpose(x_neighbors, 1, 2), x_neighbors))
         # x_neighbors = torch.bmm(x_neighbors, weight) #.view(num_pts, feats, num_neighbor)
         x_neighbors = torch.bmm(x_neighbors.view(num_pts, bsize*feats, num_neighbor), self.adjweight)  #self.sparsemax(self.adjweight))
+        x_neighbors = x_neighbors.view(num_pts, bsize, feats, num_neighbor).permute(1, 0, 3, 2).contiguous()
+        x_neighbors = self.activation(x_neighbors.view(bsize*num_pts, num_neighbor*feats))
+        out_feat = self.activation(self.conv(x_neighbors)).view(bsize,num_pts,self.out_c)
+        out_feat = out_feat * self.zero_padding.to(out_feat.device)
+        return out_feat
+
+class PaiConvSmall(nn.Module):
+    def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
+        super(PaiConvSmall,self).__init__()
+        self.in_c = in_c
+        self.out_c = out_c
+        self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
+        self.mlp = nn.Linear(7*9, 16)
+        self.adjweight = nn.Parameter(torch.randn(16, num_neighbor, num_neighbor), requires_grad=True)
+        self.adjweight.data = torch.eye(num_neighbor).unsqueeze(0).expand_as(self.adjweight)
+        self.zero_padding = torch.ones((1, num_pts, 1))
+        self.zero_padding[0,-1,0] = 0.0
+        self.softmax = Sparsemax(dim=-1) # nn.Softmax(dim=1)
+        if activation == 'relu':
+            self.activation = nn.ReLU()
+        elif activation == 'elu':
+            self.activation = nn.ELU()
+        elif activation == 'leaky_relu':
+            self.activation = nn.LeakyReLU(0.02)
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
+        elif activation == 'tanh':
+            self.activation = nn.Tanh()
+        elif activation == 'identity':
+            self.activation = lambda x: x
+        else:
+            raise NotImplementedError()
+
+    def forward(self, x, t_vertex, neighbor_index):
+        bsize, num_pts, feats = x.size()
+        _, _, num_neighbor = neighbor_index.size()
+        
+        neighbor_index = neighbor_index.view(bsize*num_pts*num_neighbor) # [1d array of batch,vertx,vertx-adj]
+        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
+        x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats)
+        x_neighbors = x_neighbors.permute(1, 0, 3, 2).contiguous()
+
+        adjweightBase = self.softmax(self.mlp(t_vertex))
+        adjweight = torch.einsum('nb,bkt->nkt', adjweightBase, self.adjweight)
+        x_neighbors = torch.bmm(x_neighbors.view(num_pts, bsize*feats, num_neighbor), adjweight)
         x_neighbors = x_neighbors.view(num_pts, bsize, feats, num_neighbor).permute(1, 0, 3, 2).contiguous()
         x_neighbors = self.activation(x_neighbors.view(bsize*num_pts, num_neighbor*feats))
         out_feat = self.activation(self.conv(x_neighbors)).view(bsize,num_pts,self.out_c)
@@ -118,11 +164,11 @@ class PaiAutoencoder(nn.Module):
         input_size = filters_enc[0][0]
         for i in range(len(num_neighbors)-1):
             if filters_enc[1][i]:
-                self.conv.append(FeaStConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
+                self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
                                             activation=self.activation))
                 input_size = filters_enc[1][i]
 
-            self.conv.append(FeaStConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
+            self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
                                         activation=self.activation))
             input_size = filters_enc[0][i+1]
 
@@ -135,24 +181,24 @@ class PaiAutoencoder(nn.Module):
         input_size = filters_dec[0][0]
         for i in range(len(num_neighbors)-1):
             if i != len(num_neighbors)-2:
-                self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                              activation=self.activation))
                 input_size = filters_dec[0][i+1]  
                 
                 if filters_dec[1][i+1]:
-                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[1][i+1]
             else:
                 if filters_dec[1][i+1]:
-                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[0][i+1]                      
-                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation='identity')) 
                     input_size = filters_dec[1][i+1] 
                 else:
-                    self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation='identity'))
                     input_size = filters_dec[0][i+1]                      
                     

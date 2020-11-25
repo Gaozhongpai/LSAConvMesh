@@ -2,6 +2,7 @@ import os
 import torch
 from tqdm import tqdm
 import numpy as np
+import time 
 
 def train_autoencoder_dataloader(dataloader_train, dataloader_val,
                                  device, model, optim, loss_fn, 
@@ -17,6 +18,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
         model.train()
             
         tloss = []
+        start_time = time.time()
         for b, sample_dict in enumerate(tqdm(dataloader_train)):
             optim.zero_grad()
                 
@@ -50,6 +52,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
                 writer.add_scalar('loss/loss/data_loss',loss.item(),total_steps)
                 writer.add_scalar('training/learning_rate', optim.param_groups[0]['lr'],total_steps)
             total_steps += 1
+        print("--- %s seconds ---" % (time.time() - start_time))
         # validate
         model.eval()
         vloss = []
@@ -94,7 +97,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
         else:
             print('epoch {0} | tr {1} '.format(epoch,epoch_tloss))
 
-        shape_dict = model.module.state_dict()
+        shape_dict = model.state_dict()
         shape_dict = {k: v for k, v in shape_dict.items() if 'D.' not in k and 'U.' not in k}
         torch.save({'epoch': epoch,
             'autoencoder_state_dict': shape_dict,  #model.state_dict(),
