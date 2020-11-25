@@ -32,7 +32,7 @@ class PaiConv(nn.Module):
         else:
             raise NotImplementedError()
 
-    def forward(self,x,neighbor_index):
+    def forward(self, x, t_vertex, neighbor_index):
         bsize, num_pts, feats = x.size()
         _, _, num_neighbor = neighbor_index.size()
         
@@ -56,8 +56,8 @@ class PaiConvSmall(nn.Module):
         self.in_c = in_c
         self.out_c = out_c
         self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
-        self.mlp = nn.Linear(7*9, 16)
-        self.adjweight = nn.Parameter(torch.randn(16, num_neighbor, num_neighbor), requires_grad=True)
+        self.mlp = nn.Linear(7*9, 32)
+        self.adjweight = nn.Parameter(torch.randn(32, num_neighbor, num_neighbor), requires_grad=True)
         self.adjweight.data = torch.eye(num_neighbor).unsqueeze(0).expand_as(self.adjweight)
         self.zero_padding = torch.ones((1, num_pts, 1))
         self.zero_padding[0,-1,0] = 0.0
@@ -142,7 +142,8 @@ class FeaStConv(nn.Module):
 
 
 class PaiAutoencoder(nn.Module):
-    def __init__(self, filters_enc, filters_dec, latent_size, sizes, num_neighbors, x_neighbors, D, U, activation = 'elu'):
+    def __init__(self, filters_enc, filters_dec, latent_size, 
+                 t_vertices, sizes, num_neighbors, x_neighbors, D, U, activation = 'elu'):
         super(PaiAutoencoder, self).__init__()
         self.latent_size = latent_size
         self.sizes = sizes
@@ -155,6 +156,13 @@ class PaiAutoencoder(nn.Module):
         self.D = nn.ParameterList(self.D)
         self.U = [nn.Parameter(x, False) for x in U]
         self.U = nn.ParameterList(self.U)
+
+        self.t_vertices = [x[self.x_neighbors[i]].permute(0, 2, 1).contiguous() for i, x in enumerate(t_vertices)]
+        t_vertices_repeat = [x[:, :, 0:1].expand_as(x) for x in self.t_vertices]
+        self.t_vertices = [torch.cat([x - t_vertices_repeat[i], t_vertices_repeat[i], 
+                            torch.norm(x - t_vertices_repeat[i], dim=1, keepdim=True)], dim=1)
+                            for i, x in enumerate(self.t_vertices)]
+        self.t_vertices = [x.view(x.shape[0], -1) for x in self.t_vertices]
 
         self.eps = 1e-7
         #self.reset_parameters()
@@ -226,13 +234,13 @@ class PaiAutoencoder(nn.Module):
         bsize = x.size(0)
         S = self.x_neighbors
         D = self.D
-        
+        t_vertices = self.t_vertices
         j = 0
         for i in range(len(self.num_neighbors)-1):
-            x = self.conv[j](x,S[i].repeat(bsize,1,1))
+            x = self.conv[j](x, t_vertices[i], S[i].repeat(bsize,1,1))
             j+=1
             if self.filters_enc[1][i]:
-                x = self.conv[j](x,S[i].repeat(bsize,1,1))
+                x = self.conv[j](x, t_vertices[i], S[i].repeat(bsize,1,1))
                 j+=1
             #x = torch.matmul(D[i],x)
             x = self.poolwT(x, D[i])
@@ -243,16 +251,18 @@ class PaiAutoencoder(nn.Module):
         bsize = z.size(0)
         S = self.x_neighbors
         U = self.U
+        t_vertices = self.t_vertices
+
         x = self.fc_latent_dec(z)
         x = x.view(bsize,self.sizes[-1]+1,-1)
         j=0
         for i in range(len(self.num_neighbors)-1):
             #x = torch.matmul(U[-1-i],x)
             x = self.poolwT(x, U[-1-i])
-            x = self.dconv[j](x,S[-2-i].repeat(bsize,1,1))
+            x = self.dconv[j](x, t_vertices[-2-i], S[-2-i].repeat(bsize,1,1))
             j+=1
             if self.filters_dec[1][i+1]: 
-                x = self.dconv[j](x,S[-2-i].repeat(bsize,1,1))
+                x = self.dconv[j](x, t_vertices[-2-i], S[-2-i].repeat(bsize,1,1))
                 j+=1
         return x
 

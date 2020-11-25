@@ -51,8 +51,8 @@ downsample_directory = os.path.join(root_dir, downsample_method)
 ds_factors = [4, 4, 4, 4]
 kernal_size = [9, 9, 9, 9, 9]
 step_sizes = [2, 2, 1, 1, 1]
-filter_sizes_enc = [[3, 16, 32, 64, 128],[[],[],[],[],[]]]
-filter_sizes_dec = [[128, 64, 32, 32, 16],[[],[],[],[],3]]
+filter_sizes_enc = [[3, 32, 64, 84, 128],[[],[],[],[],[]]]
+filter_sizes_dec = [[128, 84, 64, 64, 32],[[],[],[],[],3]]
 
 args = {'generative_model': generative_model,
         'name': name, 'data': os.path.join(root_dir, 'Processed',name),
@@ -129,6 +129,7 @@ if not os.path.exists(os.path.join(args['downsample_directory'],'downsampling_ma
     with open(os.path.join(args['downsample_directory'],'downsampling_matrices.pkl'), 'wb') as fp:
         M_verts_faces = [(M[i].v, M[i].f) for i in range(len(M))]
         pickle.dump({'M_verts_faces':M_verts_faces,'A':A,'D':D,'U':U,'F':F}, fp)
+    
 else:
     print("Loading Transform Matrices ..")
     with open(os.path.join(args['downsample_directory'],'downsampling_matrices.pkl'), 'rb') as fp:
@@ -145,6 +146,7 @@ else:
     U = downsampling_matrices['U']
     F = downsampling_matrices['F']
 
+vertices = [torch.cat([torch.tensor(M_verts_faces[i][0], dtype=torch.float32), torch.zeros((1, 3), dtype=torch.float32)], 0).to(device) for i in range(len(M_verts_faces))]
 #%%
 if shapedata.meshpackage == 'mpi-mesh':
     sizes = [x.v.shape[0] for x in M]
@@ -223,6 +225,7 @@ if 'pai_autoencoder_lsa_small' in args['generative_model']:
                               filters_dec = args['filter_sizes_dec'],
                               latent_size=args['nz'],
                               sizes=sizes,
+                              t_vertices=vertices,
                               num_neighbors=kernal_size,
                               x_neighbors=Adj,
                               D=tD, U=tU).to(device)

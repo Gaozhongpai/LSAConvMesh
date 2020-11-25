@@ -52,7 +52,7 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
                 writer.add_scalar('loss/loss/data_loss',loss.item(),total_steps)
                 writer.add_scalar('training/learning_rate', optim.param_groups[0]['lr'],total_steps)
             total_steps += 1
-        print("--- %s seconds ---" % (time.time() - start_time))
+        # print("--- %s seconds ---" % (time.time() - start_time))
         # validate
         model.eval()
         vloss = []
