@@ -164,11 +164,11 @@ class PaiAutoencoder(nn.Module):
         input_size = filters_enc[0][0]
         for i in range(len(num_neighbors)-1):
             if filters_enc[1][i]:
-                self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
+                self.conv.append(PaiConvSmall(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[1][i],
                                             activation=self.activation))
                 input_size = filters_enc[1][i]
 
-            self.conv.append(PaiConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
+            self.conv.append(PaiConvSmall(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[0][i+1],
                                         activation=self.activation))
             input_size = filters_enc[0][i+1]
 
@@ -181,24 +181,24 @@ class PaiAutoencoder(nn.Module):
         input_size = filters_dec[0][0]
         for i in range(len(num_neighbors)-1):
             if i != len(num_neighbors)-2:
-                self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                self.dconv.append(PaiConvSmall(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                              activation=self.activation))
                 input_size = filters_dec[0][i+1]  
                 
                 if filters_dec[1][i+1]:
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(PaiConvSmall(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[1][i+1]
             else:
                 if filters_dec[1][i+1]:
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(PaiConvSmall(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation=self.activation))
                     input_size = filters_dec[0][i+1]                      
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
+                    self.dconv.append(PaiConvSmall(self.x_neighbors[-2-i].shape[0], input_size,num_neighbors[-2-i], filters_dec[1][i+1],
                                                  activation='identity')) 
                     input_size = filters_dec[1][i+1] 
                 else:
-                    self.dconv.append(PaiConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
+                    self.dconv.append(PaiConvSmall(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[0][i+1],
                                                  activation='identity'))
                     input_size = filters_dec[0][i+1]                      
                     

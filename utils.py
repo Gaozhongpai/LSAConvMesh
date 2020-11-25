@@ -71,3 +71,15 @@ def get_adj(A):
             kernal_size - 1 - i.size(0))-1], 0) for inx, i in enumerate(index_list)], 0)
         Adj.append(index_list)
     return Adj
+
+class IOStream():
+    def __init__(self, path):
+        self.f = open(path, 'a')
+
+    def cprint(self, text):
+        print(text)
+        self.f.write(text+'\n')
+        self.f.flush()
+
+    def close(self):
+        self.f.close()

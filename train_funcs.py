@@ -5,7 +5,7 @@ import numpy as np
 import time 
 
 def train_autoencoder_dataloader(dataloader_train, dataloader_val,
-                                 device, model, optim, loss_fn, 
+                                 device, model, optim, loss_fn, io,
                                  bsize, start_epoch, n_epochs, eval_freq, scheduler = None,
                                  writer=None, save_recons=True, shapedata = None,
                                  metadata_dir=None, samples_dir = None, checkpoint_path=None):
@@ -92,10 +92,12 @@ def train_autoencoder_dataloader(dataloader_train, dataloader_val,
         if len(dataloader_val.dataset) > 0:
             epoch_vloss = sum(vloss) / float(len(dataloader_val.dataset))
             writer.add_scalar('avg_epoch_valid_loss', epoch_vloss,epoch)
-            print('epoch {0} | tr {1} | val {2}'.format(epoch,epoch_tloss,epoch_vloss))
+            # print('epoch {0} | tr {1} | val {2}'.format(epoch,epoch_tloss,epoch_vloss))
+            io.cprint('epoch {0} | tr {1} | val {2}'.format(epoch,epoch_tloss,epoch_vloss))
             # print(torch.topk(model.module.index_weight[0], k=8, dim=1))
         else:
-            print('epoch {0} | tr {1} '.format(epoch,epoch_tloss))
+            io.cprint('epoch {0} | tr {1} '.format(epoch,epoch_tloss))
+            # print('epoch {0} | tr {1} '.format(epoch,epoch_tloss))
 
         shape_dict = model.state_dict()
         shape_dict = {k: v for k, v in shape_dict.items() if 'D.' not in k and 'U.' not in k}
