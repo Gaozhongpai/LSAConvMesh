@@ -28,7 +28,7 @@ from utils import IOStream
 
 from sklearn.metrics.pairwise import euclidean_distances
 meshpackage = 'trimesh' # 'mpi-mesh', trimesh'
-root_dir = '/home/yyy/code/dfaustData/'  #Neural3DMMdata'  # dfaustData'
+root_dir = '/media/pai/data/dfaustData/'  #Neural3DMMdata'  # dfaustData'
 
 dataset = 'd3dfacs_alignments'
 name = 'sliced'
@@ -41,7 +41,7 @@ torch.cuda.get_device_name(device_idx)
 #%%
 args = {}
 
-generative_model = 'pai_autoencoder_lsa_small'
+generative_model = 'pai_lsa_small_tmpt_fourier'
 downsample_method = 'COMA_downsample' # choose'COMA_downsample' or 'meshlab_downsample'
 
 
@@ -51,8 +51,8 @@ downsample_directory = os.path.join(root_dir, downsample_method)
 ds_factors = [4, 4, 4, 4]
 kernal_size = [9, 9, 9, 9, 9]
 step_sizes = [2, 2, 1, 1, 1]
-filter_sizes_enc = [[3, 32, 64, 84, 128],[[],[],[],[],[]]]
-filter_sizes_dec = [[128, 84, 64, 64, 32],[[],[],[],[],3]]
+filter_sizes_enc = [[3, 16, 32, 64, 128],[[],[],[],[],[]]]
+filter_sizes_dec = [[128, 64, 32, 32, 16],[[],[],[],[],3]]
 
 args = {'generative_model': generative_model,
         'name': name, 'data': os.path.join(root_dir, 'Processed',name),
@@ -220,7 +220,7 @@ dataloader_test = DataLoader(
     #num_workers = args['num_workers']
     )
 
-if 'pai_autoencoder_lsa_small' in args['generative_model']:
+if 'pai_lsa_small_tmpt_fourier' in args['generative_model']:
     model = PaiAutoencoder(filters_enc = args['filter_sizes_enc'],
                               filters_dec = args['filter_sizes_dec'],
                               latent_size=args['nz'],
@@ -279,7 +279,7 @@ if args['mode'] == 'train':
     else:
         start_epoch = 0
 
-    if args['generative_model'] == 'pai_autoencoder_lsa_small':
+    if args['generative_model'] == 'pai_lsa_small_tmpt_fourier':
         train_autoencoder_dataloader(dataloader_train, dataloader_val,
                           device, model, optim, loss_fn, io,
                           bsize = args['batch_size'],
