@@ -41,7 +41,7 @@ torch.cuda.get_device_name(device_idx)
 #%%
 args = {}
 
-generative_model = 'pai_lsa_small_tmpt_fourier'
+generative_model = 'feast-Conv'
 downsample_method = 'COMA_downsample' # choose'COMA_downsample' or 'meshlab_downsample'
 
 
@@ -220,7 +220,7 @@ dataloader_test = DataLoader(
     #num_workers = args['num_workers']
     )
 
-if 'pai_lsa_small_tmpt_fourier' in args['generative_model']:
+if 'feast-Conv' in args['generative_model']:
     model = PaiAutoencoder(filters_enc = args['filter_sizes_enc'],
                               filters_dec = args['filter_sizes_dec'],
                               latent_size=args['nz'],
@@ -279,7 +279,7 @@ if args['mode'] == 'train':
     else:
         start_epoch = 0
 
-    if args['generative_model'] == 'pai_lsa_small_tmpt_fourier':
+    if args['generative_model'] == 'feast-Conv':
         train_autoencoder_dataloader(dataloader_train, dataloader_val,
                           device, model, optim, loss_fn, io,
                           bsize = args['batch_size'],
