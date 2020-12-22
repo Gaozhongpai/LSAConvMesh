@@ -44,9 +44,9 @@ class PaiConv(nn.Module):
         out_feat = out_feat * self.zero_padding.to(out_feat.device)
         return out_feat
 
-class PaiConvMatrix(nn.Module):
+class PaiConvSmall(nn.Module):
     def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
-        super(PaiConvMatrix,self).__init__()
+        super(PaiConvSmall,self).__init__()
         self.in_c = in_c
         self.out_c = out_c
         self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
@@ -80,43 +80,9 @@ class PaiConvMatrix(nn.Module):
         out_feat = out_feat * self.zero_padding.to(out_feat.device)
         return out_feat
 
-class PaiConvISO(nn.Module):
-    def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
-        super(PaiConvISO,self).__init__()
-        self.in_c = in_c
-        self.out_c = out_c
-        self.conv = nn.Conv2d(in_c,out_c, kernel_size=1,bias=bias)
-        self.adjweight = nn.Parameter(torch.randn(num_pts, num_neighbor, num_neighbor), requires_grad=True)
-        self.adjweight.data = torch.eye(num_neighbor).unsqueeze(0).expand_as(self.adjweight)
-        self.zero_padding = torch.ones((1, num_pts, 1))
-        self.zero_padding[0,-1,0] = 0.0
-        #self.sparsemax = Sparsemax(dim=1)
-        if activation == 'relu':
-            self.activation = nn.ReLU()
-        elif activation == 'elu':
-            self.activation = nn.ELU()
-        elif activation == 'identity':
-            self.activation = lambda x: x
-        else:
-            raise NotImplementedError()
-
-    def forward(self, x, t_vertex, neighbor_index):
-        bsize, num_pts, feats = x.size()
-        _, _, num_neighbor = neighbor_index.size()
-        
-        neighbor_index = neighbor_index.view(bsize*num_pts*num_neighbor) # [1d array of batch,vertx,vertx-adj]
-        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
-        x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats)
-
-        x_neighbors = torch.einsum('bnkf, bnkt->bfnt', x_neighbors, self.adjweight[None].repeat(bsize, 1, 1, 1))   #self.sparsemax(self.adjweight))
-        out_feat = self.activation(self.conv(self.activation(x_neighbors)))
-        out_feat = torch.max(out_feat, -1)[0].permute(0, 2, 1).contiguous()
-        out_feat = out_feat * self.zero_padding.to(out_feat.device)
-        return out_feat
-
-class PaiConvSmall(nn.Module):
+class PaiConvTiny(nn.Module):
     def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='relu',bias=True): # ,device=None):
-        super(PaiConvSmall,self).__init__()
+        super(PaiConvTiny,self).__init__()
         self.in_c = in_c
         self.out_c = out_c
         self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
@@ -156,6 +122,39 @@ class PaiConvSmall(nn.Module):
         out_feat = out_feat * self.zero_padding.to(out_feat.device)
         return out_feat
 
+class PaiConvISO(nn.Module):
+    def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
+        super(PaiConvISO,self).__init__()
+        self.in_c = in_c
+        self.out_c = out_c
+        self.conv = nn.Conv2d(in_c,out_c, kernel_size=1,bias=bias)
+        self.adjweight = nn.Parameter(torch.randn(num_pts, num_neighbor, num_neighbor), requires_grad=True)
+        self.adjweight.data = torch.eye(num_neighbor).unsqueeze(0).expand_as(self.adjweight)
+        self.zero_padding = torch.ones((1, num_pts, 1))
+        self.zero_padding[0,-1,0] = 0.0
+        #self.sparsemax = Sparsemax(dim=1)
+        if activation == 'relu':
+            self.activation = nn.ReLU()
+        elif activation == 'elu':
+            self.activation = nn.ELU()
+        elif activation == 'identity':
+            self.activation = lambda x: x
+        else:
+            raise NotImplementedError()
+
+    def forward(self, x, t_vertex, neighbor_index):
+        bsize, num_pts, feats = x.size()
+        _, _, num_neighbor = neighbor_index.size()
+        
+        neighbor_index = neighbor_index.view(bsize*num_pts*num_neighbor) # [1d array of batch,vertx,vertx-adj]
+        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
+        x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats)
+
+        x_neighbors = torch.einsum('bnkf, bnkt->bfnt', x_neighbors, self.adjweight[None].repeat(bsize, 1, 1, 1))   #self.sparsemax(self.adjweight))
+        out_feat = self.activation(self.conv(self.activation(x_neighbors)))
+        out_feat = torch.max(out_feat, -1)[0].permute(0, 2, 1).contiguous()
+        out_feat = out_feat * self.zero_padding.to(out_feat.device)
+        return out_feat
 
 class FeaStConv(nn.Module):
     def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='relu',bias=True): # ,device=None):
@@ -204,45 +203,7 @@ class FeaStConv(nn.Module):
         out_feat =  (x_j * q).sum(dim=2) + self.bias
         out_feat = out_feat * self.zero_padding.to(out_feat.device)
         return self.activation(out_feat)
-
-
-class PointCNN(nn.Module):
-    def __init__(self, num_pts, in_c, num_neighbor, out_c,activation='elu',bias=True): # ,device=None):
-        super(PointCNN,self).__init__()
-        self.in_c = in_c
-        self.out_c = out_c
-        self.conv = nn.Linear(in_c*num_neighbor,out_c,bias=bias)
-        self.mlp = nn.Linear(in_c, num_neighbor)
-        self.zero_padding = torch.ones((1, num_pts, 1))
-        self.zero_padding[0,-1,0] = 0.0
-        self.softmax = nn.Softmax(dim=1)
-        if activation == 'relu':
-            self.activation = nn.ReLU()
-        elif activation == 'elu':
-            self.activation = nn.ELU()
-        elif activation == 'identity':
-            self.activation = lambda x: x
-        else:
-            raise NotImplementedError()
-
-    def forward(self,x,neighbor_index):
-        bsize, num_pts, feats = x.size()
-        _, _, num_neighbor = neighbor_index.size()
         
-        neighbor_index = neighbor_index.view(bsize*num_pts*num_neighbor) # [1d array of batch,vertx,vertx-adj]
-        batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
-        x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats).view(bsize*num_pts, num_neighbor, feats)
-
-        #### relative position ####
-        x_relative = x_neighbors - x_neighbors[:, 0:1]
-        permatrix = self.softmax(self.mlp(x_relative.view(-1, feats))).view(bsize*num_pts, num_neighbor, -1)
-
-        x_neighbors = x_neighbors.permute(0, 2, 1).contiguous()
-        x_neighbors = torch.matmul(x_neighbors, permatrix).view(bsize*num_pts, -1) 
-        out_feat = self.activation(self.conv(x_neighbors)).view(bsize,num_pts,self.out_c)  
-        out_feat = out_feat * self.zero_padding.to(out_feat.device)
-        return out_feat
-
 class PaiAutoencoder(nn.Module):
     def __init__(self, filters_enc, filters_dec, latent_size, 
                  t_vertices, sizes, num_neighbors, x_neighbors, D, U, activation = 'elu'):
