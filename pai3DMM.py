@@ -17,7 +17,7 @@ from autoencoder_dataset import autoencoder_dataset
 from torch.utils.data import DataLoader
 
 from utils import get_adj, sparse_mx_to_torch_sparse_tensor
-from models import PaiAutoencoder
+from modelsRes import PaiAutoencoder
 from train_funcs import train_autoencoder_dataloader
 from test_funcs import test_autoencoder_dataloader
 import scipy.sparse as sp
@@ -41,7 +41,7 @@ torch.cuda.get_device_name(device_idx)
 #%%
 args = {}
 
-generative_model = 'feast-Conv'
+generative_model = 'test'
 downsample_method = 'COMA_downsample' # choose'COMA_downsample' or 'meshlab_downsample'
 
 
@@ -51,8 +51,8 @@ downsample_directory = os.path.join(root_dir, downsample_method)
 ds_factors = [4, 4, 4, 4]
 kernal_size = [9, 9, 9, 9, 9]
 step_sizes = [2, 2, 1, 1, 1]
-filter_sizes_enc = [[3, 16, 32, 64, 128],[[],[],[],[],[]]]
-filter_sizes_dec = [[128, 64, 32, 32, 16],[[],[],[],[],3]]
+filter_sizes_enc = [3, 16, 32, 64, 128]
+filter_sizes_dec = [128, 64, 32, 32, 16, 3]
 
 args = {'generative_model': generative_model,
         'name': name, 'data': os.path.join(root_dir, 'Processed',name),
@@ -220,7 +220,7 @@ dataloader_test = DataLoader(
     #num_workers = args['num_workers']
     )
 
-if 'feast-Conv' in args['generative_model']:
+if 'test' in args['generative_model']:
     model = PaiAutoencoder(filters_enc = args['filter_sizes_enc'],
                               filters_dec = args['filter_sizes_dec'],
                               latent_size=args['nz'],
@@ -279,7 +279,7 @@ if args['mode'] == 'train':
     else:
         start_epoch = 0
 
-    if args['generative_model'] == 'feast-Conv':
+    if args['generative_model'] == 'test':
         train_autoencoder_dataloader(dataloader_train, dataloader_val,
                           device, model, optim, loss_fn, io,
                           bsize = args['batch_size'],
@@ -304,7 +304,7 @@ if args['mode'] == 'test':
     pretrained_dict = checkpoint_dict['autoencoder_state_dict']
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and "U." not in k and "D." not in k}
     model_dict.update(pretrained_dict) 
-    model.load_state_dict(pretrained_dict, strict=False)
+    # model.load_state_dict(pretrained_dict, strict=False)
     #model.load_state_dict(checkpoint_dict['autoencoder_state_dict'])
 
     predictions, norm_l1_loss, l2_loss = test_autoencoder_dataloader(device, model, dataloader_test,
