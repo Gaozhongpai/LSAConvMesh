@@ -93,9 +93,9 @@ class PaiConvTiny(nn.Module):
         # self.fc1 = nn.Linear(in_c, in_c)
         # self.fc2 = nn.Linear(out_c, out_c)
         mappingsize = 64
-        self.num_base = 64
+        self.num_base = 32
         self.num_neighbor = num_neighbor
-        if self.num_base < num_pts:
+        if num_pts > 128:
             num_base = self.num_base
             self.temp_factor = 100
             self.tmptmlp = nn.Linear(mappingsize*2, 1)
@@ -131,7 +131,7 @@ class PaiConvTiny(nn.Module):
         batch_index = torch.arange(bsize, device=x.device).view(-1,1).repeat([1,num_pts*num_neighbor]).view(-1).long() 
         x_neighbors = x[batch_index,neighbor_index,:].view(bsize, num_pts, num_neighbor, feats)
 
-        if self.num_base < num_pts:
+        if num_pts > 128:
             tmpt = torch.sigmoid(self.tmptmlp(t_vertex))*(0.1 - 1.0/self.temp_factor) + 1.0/self.temp_factor 
             adjweightBase = self.softmax(self.mlp(t_vertex)/tmpt)
             adjweight = torch.einsum('ns,skt->nkt', adjweightBase, self.adjweight)[None].repeat(bsize, 1, 1, 1)
@@ -244,13 +244,11 @@ class PaiAutoencoder(nn.Module):
         self.U = nn.ParameterList(self.U)
 
         mappingsize = 64
-        self.B = nn.Parameter(torch.randn(7*9, mappingsize) , requires_grad=False)  
-        self.t_vertices = [x[self.x_neighbors[i]].permute(0, 2, 1).contiguous() for i, x in enumerate(t_vertices)]
-        t_vertices_repeat = [x[:, :, 0:1].expand_as(x) for x in self.t_vertices]
-        self.t_vertices = [torch.cat([x - t_vertices_repeat[i], t_vertices_repeat[i], 
-                            torch.norm(x - t_vertices_repeat[i], dim=1, keepdim=True)], dim=1)
-                            for i, x in enumerate(self.t_vertices)]
-        self.t_vertices = [2.*math.pi*x.view(x.shape[0], -1) @ (self.B.data).to(x) for x in self.t_vertices]
+        self.B = nn.Parameter(torch.randn(6, mappingsize) , requires_grad=False)  
+        self.t_vertices = [torch.cat([x[self.x_neighbors[i]][:, 1:].mean(dim=1) - x, x], dim=-1) for i, x in enumerate(t_vertices)]
+        self.t_vertices = [2.*math.pi*x @ (self.B.data).to(x) for x in self.t_vertices]
+        self.t_vertices = [((x - x.min(dim=0, keepdim=True)[0]) / (x.max(dim=0, keepdim=True)[0] \
+                             - x.min(dim=0, keepdim=True)[0]) - 0.5)*100 for x in self.t_vertices]
         self.t_vertices = [torch.cat([torch.sin(x), torch.cos(x)], dim=-1) for x in self.t_vertices]
 
         self.eps = 1e-7
@@ -260,25 +258,25 @@ class PaiAutoencoder(nn.Module):
         self.conv = []
         input_size = filters_enc[0]
         for i in range(len(num_neighbors)-1):
-            self.conv.append(FeaStConv(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[i+1],
+            self.conv.append(PaiConvTiny(self.x_neighbors[i].shape[0], input_size, num_neighbors[i], filters_enc[i+1],
                                         activation=self.activation))
             input_size = filters_enc[i+1]
 
         self.conv = nn.ModuleList(self.conv)   
         
-        self.fc_latent_enc = nn.Linear((sizes[-1])*input_size, latent_size)
+        self.fc_latent_enc = nn.Linear((sizes[-1]+1)*input_size, latent_size)
         self.fc_latent_dec = nn.Linear(latent_size, (sizes[-1]+1)*filters_dec[0])
         
         self.dconv = []
         input_size = filters_dec[0]
         for i in range(len(num_neighbors)-1):
-            self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[i+1],
+            self.dconv.append(PaiConvTiny(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[i+1],
                                             activation=self.activation))
             input_size = filters_dec[i+1]  
 
             if i == len(num_neighbors)-2:
                 input_size = filters_dec[-2]
-                self.dconv.append(FeaStConv(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[-1],
+                self.dconv.append(PaiConvTiny(self.x_neighbors[-2-i].shape[0], input_size, num_neighbors[-2-i], filters_dec[-1],
                                                 activation='identity'))
                     
         self.dconv = nn.ModuleList(self.dconv)
@@ -305,7 +303,7 @@ class PaiAutoencoder(nn.Module):
             #x = torch.matmul(D[i],x)
             x = self.poolwT(x, D[i])
         # x = self.conv[-1](x, t_vertices[-1], S[-1].repeat(bsize,1,1))
-        x = x[:, :-1].view(bsize,-1)
+        x = x.view(bsize,-1)
         return self.fc_latent_enc(x)
     
     def decode(self,z):
@@ -326,6 +324,9 @@ class PaiAutoencoder(nn.Module):
 
     def forward(self,x):
         bsize = x.size(0)
+        # alpha = torch.linspace(0, 1, steps=5).cuda().unsqueeze(1)
         z = self.encode(x)
+        # z[2:7] = alpha * z[0:1] + (1-alpha)*z[1:2]
+        # z[9:14] = alpha * z[7:8] + (1-alpha)*z[8:9]
         x = self.decode(z)
         return x

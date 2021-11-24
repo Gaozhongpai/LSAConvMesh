@@ -21,7 +21,7 @@ class autoencoder_dataset(Dataset):
     def __getitem__(self, idx):
         basename = self.paths[idx]
         
-        verts_init = torch.load(os.path.join(self.root_dir,'points'+'_'+self.points_dataset, basename+'.tch'))
+        verts_init = torch.load(os.path.join(self.root_dir,'points'+'_'+self.points_dataset, basename+'.tch'))# ['mesh']
         if self.normalization:
             verts_init = verts_init - self.shapedata.mean
             verts_init = verts_init/self.shapedata.std

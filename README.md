@@ -84,12 +84,13 @@ The structure of this codebase is borrowed from [Neural3DMM](https://github.com/
 Please consider citing our work if you find it useful:
 
 ```
-@misc{gao2020learning,
-    title={Learning Local Neighboring Structure for Robust 3D Shape Representation},
-    author={Zhongpai Gao and Guangtao Zhai and Juyong Zhang and Junchi Yan and Yiyan Yang and Xiaokang Yang},
-    year={2020},
-    eprint={2004.09995},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
-}
+@article{GaoAAAI21, 
+title={Learning Local Neighboring Structure for Robust {3D} Shape Representation}, 
+volume={35}, 
+number={2}, 
+journal={Proceedings of the AAAI Conference on Artificial Intelligence (AAAI)}, 
+author={Gao, Zhongpai and Yan, Junchi and Zhai, Guangtao and Zhang, Juyong and Yang, Yiyan and Yang, Xiaokang}, year={2021}, 
+month={May}, 
+pages={1397-1405}}
+
 ```
